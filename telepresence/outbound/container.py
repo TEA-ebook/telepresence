@@ -230,5 +230,14 @@ def run_docker_command(
             runner.write("Killing local container...\n")
             make_docker_kill(runner, container_name)()
 
+    def restart() -> None:
+        nonlocal process
+
+        runner.write("Restarting containers...\n")
+        if process.poll() is None:
+            make_docker_kill(runner, container_name)()
+        process = subprocess.Popen(docker_command, env=docker_env)
+        return process
+
     runner.add_cleanup("Terminate local container", terminate_if_alive)
-    return process
+    return process, restart

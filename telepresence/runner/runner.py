@@ -702,6 +702,7 @@ class Runner:
         Monitor main process and background items until done
         """
         main_code = None
+        active = True
 
         def wait_for_process(p: "Popen[str]") -> None:
             """Wait for process and set main_code and self.quitting flag
@@ -712,7 +713,12 @@ class Runner:
             See https://github.com/telepresenceio/telepresence/issues/1003
             """
             nonlocal main_code
+            nonlocal active
+
             main_code = p.wait()
+            if not active:
+                return
+
             main_command = str_command(str(arg) for arg in main_process.args)
             self.write("Main process ({})".format(main_command))
             self.write(" exited with code {}.".format(main_code))
@@ -720,10 +726,16 @@ class Runner:
 
         self.write("Everything launched. Waiting to exit...")
         span = self.span()
-        Thread(target=wait_for_process, args=(main_process, )).start()
-        while not self.quitting:
-            sleep(0.1)
-        span.end()
+
+        try:
+            waiter = Thread(target=wait_for_process, args=(main_process, )).start()
+            while not self.quitting:
+                sleep(0.1)
+        except:
+            active = False
+            raise
+        finally:
+            span.end()
 
         if main_code is not None:
             # User process exited, we're done. Automatic shutdown cleanup
