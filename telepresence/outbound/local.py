@@ -109,7 +109,7 @@ def launch_inject(
     runner.add_cleanup(
         "Terminate local process", terminate_local_process, runner, process
     )
-    return process
+    return process, None
 
 
 def launch_vpn(
@@ -134,7 +134,7 @@ def launch_vpn(
     runner.add_cleanup(
         "Terminate local process", terminate_local_process, runner, process
     )
-    return process
+    return process, None
 
 
 def _flush_dns_cache(runner: Runner):

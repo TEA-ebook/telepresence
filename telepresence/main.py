@@ -16,12 +16,17 @@ Telepresence: local development environment for a remote Kubernetes cluster.
 """
 
 import sys
+import signal
 
 from telepresence import connect, mount, outbound, proxy, remote_env
 from telepresence.cli import crash_reporting, parse_args
 from telepresence.runner import Runner
 from telepresence.startup import final_checks, set_kube_command
 from telepresence.usage_tracking import call_scout
+
+
+class RestartException(Exception):
+    pass
 
 
 def main():
@@ -78,11 +83,24 @@ def main():
 
         # Set up outbound networking (pod name, ssh object)
         # Launch user command with the correct environment (...)
-        user_process = launch(
+        user_process, restart = launch(
             runner, remote_info, env, socks_port, ssh, mount_dir, pod_info
         )
 
-        runner.wait_for_exit(user_process)
+        if restart is not None:
+
+            def _restart(*_):
+                raise RestartException()
+
+            signal.signal(signal.SIGHUP, _restart)
+
+        while user_process is not None:
+            try:
+                runner.wait_for_exit(user_process)
+            except RestartException:
+                if restart is not None:
+                    runner.show("Restarting your command.")
+                    user_process = restart()
 
 
 def run_telepresence():
