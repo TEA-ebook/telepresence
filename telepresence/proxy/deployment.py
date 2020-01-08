@@ -304,10 +304,18 @@ def new_swapped_deployment(
     ndj_template["metadata"].setdefault("labels", {})["telepresence"] = run_id
     if service_account:
         ndj_template["spec"]["serviceAccountName"] = service_account
+
+    found = False
     for container, old_container in zip(
         ndj_template["spec"]["containers"],
         old_deployment["spec"]["template"]["spec"]["containers"],
     ):
+        # Drop element that slow down developments:
+        for unneeded in [
+            "livenessProbe", "readinessProbe",
+        ]:
+            container.pop(unneeded, None)
+
         if container["name"] == container_to_update:
             # Merge container ports into the expose list
             expose.merge_automatic_ports([
@@ -320,13 +328,9 @@ def new_swapped_deployment(
             container["imagePullPolicy"] = "IfNotPresent"
             # Drop unneeded fields:
             for unneeded in [
-                "args", "livenessProbe", "readinessProbe", "workingDir",
-                "lifecycle"
+                "args", "workingDir", "lifecycle"
             ]:
-                try:
-                    container.pop(unneeded)
-                except KeyError:
-                    pass
+                container.pop(unneeded, None)
             # Set running command explicitly
             container["command"] = ["/usr/src/app/run.sh"]
             # We don't write out termination file:
@@ -348,7 +352,11 @@ def new_swapped_deployment(
                     }
                 }
             })
-            return new_deployment_json
+
+            found = True
+
+    if found:
+        return new_deployment_json
 
     raise RuntimeError(
         "Couldn't find container {} in the Deployment.".
